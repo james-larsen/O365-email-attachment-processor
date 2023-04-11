@@ -8,6 +8,7 @@ imap_accounts.json
 *_email_rules.json
 !default_email_rules.json
 ~$*.xls*
+README.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
