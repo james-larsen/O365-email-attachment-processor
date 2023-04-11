@@ -1,0 +1,60 @@
+{
+  "conditions": [
+    {
+      "name": "example_entry_will_be_ignored",
+      "pattern": {
+        "sender": "@domain",
+        "subject": ["Pattern01", "Pattern02"],
+        "body": ["Pattern01", "Pattern02"],
+        "attachments": [
+          {
+            "filename": [".csv"]
+          }
+        ]
+      },
+      "delivery": {
+        "target": "local",
+        "path": "/path/to/save/files"
+      },
+      "delivery": {
+        "target": "s3", 
+        "region": "us-west-1",
+        "bucket": "my-bucket-name", 
+        "subfolder": "sub-folder1/sub-folder2/"
+      }
+    },
+    {
+      "name": "vudu_format_01",
+      "pattern": {
+        "subject": ["Daily Sales File"],
+        "body": ["Daily Sales File", "Vudu"],
+        "attachments": [
+          {
+            "filename": [".csv"]
+          }
+        ]
+      },
+      "delivery": {
+        "target": "s3",
+        "path": "nexus-delivered-email-files/vudu-files/"
+      }
+    },
+    {
+      "name": "comcast_format_01",
+      "pattern": {
+        "sender": "@comcast",
+        "subject": ["Daily Sales File"],
+        "body": ["Daily Sales File", "Comcast"],
+        "attachments": [
+          {
+            "filename": [".csv"]
+          }
+        ]
+      },
+      "delivery": {
+        "target": "local",
+        "path": "C:/Users/Phobia/Desktop"
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "o365-email-attachment-processor"
+version = "0.1.0"
+description = ""
+authors = ["James Larsen <James.Larsen42@gmail.com>"]
+readme = "README.md"
+packages = [{include = "o365-email-attachment-processor", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+boto3 = "^1.26.45"
+keyring = "^23.13.1"
+configparser = "^5.3.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
