@@ -3,11 +3,13 @@ src/utils/__pycache__
 *client_secret_*
 connection.ini
 connection_local.ini
-imap_accounts_local.json
-imap_accounts.json
+o365_accounts_local.json
+o365_accounts.json
 *_email_rules.json
 !default_email_rules.json
 ~$*.xls*
+Secrets.txt
+set_passwords.py
 README.md
 
 # Byte-compiled / optimized / DLL files
