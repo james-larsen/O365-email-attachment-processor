@@ -12,6 +12,8 @@ azure-identity = "^1.12.0"
 
 msgraph-core = "^0.2.2"
 
+openpyxl = "^3.1.2"
+
 keyring = "^23.13.1" # Optional
 
 ## Installation
@@ -27,6 +29,7 @@ poetry install
 pip install boto3
 pip install azure-identity
 pip install msgraph-core
+pip install openpyxl
 pip install keyring # Optional
 ```
 
