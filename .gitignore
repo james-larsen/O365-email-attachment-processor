@@ -11,7 +11,6 @@ o365_accounts.json
 *_bkup*
 Secrets.txt
 set_passwords.py
-README.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

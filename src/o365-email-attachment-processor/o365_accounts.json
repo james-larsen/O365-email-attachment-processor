@@ -14,7 +14,7 @@
                 "o365_username": "user2",
                 "o365_site_address": "mycompany.sharepoint.com",
                 "o365_site_name": "MySharepointSite",
-                "o365_site_folderpath": "Documents/General/MyFolder",
+                "o365_site_folderpath": "Documents/General/My Folder",
                 "o365_user_id": "xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxx",
                 "o365_tenant_id": "xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxx",
                 "o365_client_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",

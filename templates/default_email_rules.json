@@ -1,0 +1,34 @@
+{
+  "conditions": [
+    {
+      "name": "example_entry_will_be_ignored",
+      "pattern": {
+        "sender": "@domain",
+        "subject": ["Pattern01", "Pattern02"],
+        "body": ["Pattern01", "Pattern02"],
+        "attachments": [
+          {
+            "filename": [".csv"]
+          }
+        ]
+      },
+      "delivery": {
+        "target": "local",
+        "path": "/path/to/save/files", 
+        "append_datetime": ""
+      },
+      "delivery": {
+        "target": "s3", 
+        "region": "us-west-1",
+        "bucket": "my-bucket-name", 
+        "subfolder": "sub-folder1/sub-folder2/", 
+        "append_datetime": "True"
+      },
+      "delivery": {
+        "target": "email_forward",
+        "recipients": ["email@server.com"],
+        "body": "This is a custom email body"
+      }
+    }
+  ]
+}

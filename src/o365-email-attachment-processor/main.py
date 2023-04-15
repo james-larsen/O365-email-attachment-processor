@@ -106,7 +106,8 @@ def retrieve_rules(email_account_name):
                         # load the Excel workbook from file_obj
                         workbook = openpyxl.load_workbook(file_obj)
                         # get the active sheet (i.e., the first sheet)
-                        worksheet = workbook.active
+                        # worksheet = workbook.active
+                        worksheet = workbook['Email Rules']
                         # print the value in cell A1
                         # print(sheet['A1'].value)
 
@@ -120,20 +121,28 @@ def retrieve_rules(email_account_name):
                             # add the pattern dictionary
                             condition["pattern"] = {}
                             
+                            # add the sender
+                            condition["pattern"]["sender"] = row[1]
+                            
                             # add the subject as a list
-                            condition["pattern"]["subject"] = [x.strip() for x in row[1].split("|")]
+                            subject_list = row[2]
+                            subject_list = subject_list.replace("\n", "|").replace("||", "|")
+                            condition["pattern"]["subject"] = [x.strip() for x in subject_list.split("|")]
                             
                             # add the body as a list
-                            condition["pattern"]["body"] = [x.strip() for x in row[2].split("|")]
+                            body_list = row[3]
+                            body_list = body_list.replace("\n", "|").replace("||", "|")
+                            condition["pattern"]["body"] = [x.strip() for x in body_list.split("|")]
                             
                             # add the attachments filename as a list
-                            condition["pattern"]["attachments"] = [{"filename": [x.strip()]} for x in row[3].split("|")]
+                            attachments_list = row[4]
+                            attachments_list = attachments_list.replace("\n", "|").replace("||", "|")
+                            condition["pattern"]["attachments"] = [{"filename": [x.strip()]} for x in attachments_list.split("|")]
                             
                             # add the recipients as a list
-                            # condition["pattern"]["delivery"] = {"recipients": [x.strip() for x in row[4].split("|")], "body": row[5]}
-
-                            # add the recipients as a list
-                            condition["delivery"] = {"target": "email_forward", "recipients": [x.strip() for x in row[4].split("|")], "body": row[5]}
+                            recipients_list = row[5]
+                            recipients_list = recipients_list.replace("\n", "|").replace("||", "|")
+                            condition["delivery"] = {"target": "email_forward", "recipients": [x.strip() for x in recipients_list.split("|")], "body": row[6]}
                         
                             # add the condition to the output dictionary
                             email_rules["conditions"].append(condition)
@@ -218,16 +227,13 @@ else:
 for account in o365_accounts['o365_accounts']:
     email_account = account['email_account']
     email_account_name = email_account['account_name']
-
-    # read rules
-    email_rules = retrieve_rules(email_account_name)
-
     o365_email_username = email_account['o365_username']
     o365_email_user_id = email_account['o365_user_id']
     o365_email_tenant_id = email_account['o365_tenant_id']
     o365_email_client_id = email_account['o365_client_id']
     email_password_key = email_account['o365_password_key']
     o365_emailpassword = pw(email_account_name, email_password_key)
+    # build initial email client to check for any unread messages
     email_client = authenticate(o365_email_tenant_id, o365_email_client_id, o365_emailpassword)
 
     # search_parameters = {
@@ -245,6 +251,12 @@ for account in o365_accounts['o365_accounts']:
     if len(result) == 0:
         print('No Unread messages to process')
         continue
+
+    # read rules
+    email_rules = retrieve_rules(email_account_name)
+
+    # rebuild email client after potentially checking Sharepoint - building the Sharepoint client seems to affect the email client
+    email_client = authenticate(o365_email_tenant_id, o365_email_client_id, o365_emailpassword)
 
     # loop through all unread emails
     for message in result['value']:
