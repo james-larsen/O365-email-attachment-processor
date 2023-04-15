@@ -14,46 +14,20 @@
       },
       "delivery": {
         "target": "local",
-        "path": "/path/to/save/files"
+        "path": "/path/to/save/files", 
+        "append_datetime": ""
       },
       "delivery": {
         "target": "s3", 
         "region": "us-west-1",
         "bucket": "my-bucket-name", 
-        "subfolder": "sub-folder1/sub-folder2/"
-      }
-    },
-    {
-      "name": "vudu_format_01",
-      "pattern": {
-        "subject": ["Daily Sales File"],
-        "body": ["Daily Sales File", "Vudu"],
-        "attachments": [
-          {
-            "filename": [".csv"]
-          }
-        ]
+        "subfolder": "sub-folder1/sub-folder2/", 
+        "append_datetime": "True"
       },
       "delivery": {
-        "target": "s3",
-        "path": "nexus-delivered-email-files/vudu-files/"
-      }
-    },
-    {
-      "name": "comcast_format_01",
-      "pattern": {
-        "sender": "@comcast",
-        "subject": ["Daily Sales File"],
-        "body": ["Daily Sales File", "Comcast"],
-        "attachments": [
-          {
-            "filename": [".csv"]
-          }
-        ]
-      },
-      "delivery": {
-        "target": "local",
-        "path": "C:/Users/Phobia/Desktop"
+        "target": "email_forward",
+        "recipients": ["email@server.com"],
+        "body": "This is a custom email body"
       }
     }
   ]

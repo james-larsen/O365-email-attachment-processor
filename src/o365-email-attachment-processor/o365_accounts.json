@@ -4,7 +4,7 @@
             "email_account": {
                 "account_name": "XYZ_Department_Sales_Email",
                 "o365_username": "user1",
-				"o365_user_id": "xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxx",
+                "o365_user_id": "xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxx",
                 "o365_tenant_id": "xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxx",
                 "o365_client_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
                 "o365_password_key": "password_key"
@@ -12,7 +12,10 @@
             "sharepoint_account": {
                 "account_name": "XYZ_Department_Sales_SharePoint",
                 "o365_username": "user2",
-				"o365_user_id": "xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxx",
+                "o365_site_address": "mycompany.sharepoint.com",
+                "o365_site_name": "MySharepointSite",
+                "o365_site_folderpath": "Documents/General/MyFolder",
+                "o365_user_id": "xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxx",
                 "o365_tenant_id": "xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxx",
                 "o365_client_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
                 "o365_password_key": "password_key"

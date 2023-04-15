@@ -8,6 +8,7 @@ o365_accounts.json
 *_email_rules.json
 !default_email_rules.json
 ~$*.xls*
+*_bkup*
 Secrets.txt
 set_passwords.py
 README.md

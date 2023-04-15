@@ -1,27 +1,24 @@
-"""Check multiple o365 servers for new emails, evaluate them against pre-defined patterns, and deliver any attachments accordingly"""
+"""Check multiple O365 service accounts for new emails, evaluates them against pre-defined patterns, and delivers any attachments accordingly or forwards the email"""
 #%%
 import os
-# import o365lib
-import email
+import datetime
+import io
 import json
 import base64
 from pathlib import Path
-# import keyring
-import configparser
+from azure.identity import ClientSecretCredential
+from msgraph.core import GraphClient
+import openpyxl
+import boto3
+# import configparser
 # pylint: disable=import-error
 from utils.password import get_password as pw
 # pylint: enable=import-error
-import boto3
-from botocore.exceptions import ClientError
-from azure.identity import ClientSecretCredential
-from msgraph.core import GraphClient
-import datetime
 
 #%%
 
 def authenticate(tenant_id, client_id, client_secret):
     """Authenticate with the O365 server to return a client object"""
-    # client_secret = pw.get_password(account_name, o365_password_key)
 
     # Create a ClientSecretCredential object
     credential = ClientSecretCredential(tenant_id=tenant_id, client_id=client_id, client_secret=client_secret)
@@ -31,21 +28,133 @@ def authenticate(tenant_id, client_id, client_secret):
 
     return client
 
+def get_sharepoint_folder(sharepoint_client, o365_site_address, o365_site_name, o365_site_folderpath):
+    """Retrieve the address of the Sharepoint folder holding rules definitions"""
+    
+    try:
+        site_id = sharepoint_client.get(f'https://graph.microsoft.com/v1.0/sites/{o365_site_address}:/sites/{o365_site_name}').json()['id']
+
+        folder_list = sharepoint_client.get(f'https://graph.microsoft.com/v1.0/sites/{site_id}/drives?$select=id,name').json()['value']
+        folder_id = ''
+        path_folders = o365_site_folderpath.split("/")
+
+        # retrieve ID for the "Documents" base folder
+        for folder in folder_list:
+            if folder['name'] == 'Documents':
+                documents_folder_id = folder['id']
+
+        folder_list = sharepoint_client.get(f'https://graph.microsoft.com/v1.0/drives/{documents_folder_id}/root/children?$select=folder,name,id').json()['value']
+        
+        # traverse through underlying subfolders
+        for path_folder in path_folders[1:]:
+            for folder in folder_list:
+                if folder['name'] == path_folder:
+                    folder_id = folder['id']
+                    # folder_name = folder['name']
+                    folder_list = sharepoint_client.get(f'https://graph.microsoft.com/v1.0/drives/{documents_folder_id}/items/{folder_id}/children').json()['value']
+
+        return f'https://graph.microsoft.com/v1.0/drives/{documents_folder_id}/items/{folder_id}/children'
+    except:
+        return None
+
 def retrieve_rules(email_account_name):
+    """Retrieve the pattern and delivery rules from local JSON and optional Sharepoint .xlsx files"""
+    global account
     json_filename = f'{email_account_name}_email_rules.json'
 
     if os.path.exists(json_filename):
-        with open(json_filename, encoding='utf-8') as f:
-            config_data = json.load(f)
+        with open(json_filename, mode='rb') as f:
+            content = f.read().decode('utf-8').replace('\\', '\\\\')
+            email_rules = json.loads(content)
+    elif os.path.exists('default_email_rules.json'):
+        with open('default_email_rules.json', mode='rb') as f:
+            content = f.read().decode('utf-8').replace('\\', '\\\\')
+            email_rules = json.loads(content)
     else:
-        with open("default_email_rules.json", encoding='utf-8') as f:
-            config_data = json.load(f)
-    
-    return config_data
+        pass
 
-def transmit_files(condition_name, target, delivery_details, attachment_name):
+    if 'sharepoint_account' in account:
+        sharepoint_account = account['sharepoint_account']
+        sharepoint_account_name = sharepoint_account['account_name']
+        # o365_sharepoint_username = sharepoint_account['o365_username']
+        o365_site_address = sharepoint_account['o365_site_address']
+        o365_site_name = sharepoint_account['o365_site_name']
+        o365_site_folderpath = sharepoint_account['o365_site_folderpath']
+        # o365_sharepoint__user_id = sharepoint_account['o365_user_id']
+        o365_sharepoint_tenant_id = sharepoint_account['o365_tenant_id']
+        o365_sharepoint_client_id = sharepoint_account['o365_client_id']
+        sharepoint_password_key = sharepoint_account['o365_password_key']
+        o365_sharepointpassword = pw(sharepoint_account_name, sharepoint_password_key)
+        sharepoint_client = authenticate(o365_sharepoint_tenant_id, o365_sharepoint_client_id, o365_sharepointpassword)
+
+        sharepoint_folder = get_sharepoint_folder(sharepoint_client, o365_site_address, o365_site_name, o365_site_folderpath)
+        
+        if sharepoint_folder is not None:
+            try:
+                files_list = sharepoint_client.get(sharepoint_folder).json()['value']
+
+                for item in files_list:
+                    # check if the item is an Excel file
+                    if item['name'].endswith('.xlsx'):
+                        # get the download URL
+                        download_url = item['@microsoft.graph.downloadUrl']
+                        # access the file content
+                        file_content = sharepoint_client.get(download_url).content
+                        # print(item['@microsoft.graph.downloadUrl'])
+                        # print(item['name'])
+                        file_obj = io.BytesIO(file_content)
+                        # load the Excel workbook from file_obj
+                        workbook = openpyxl.load_workbook(file_obj)
+                        # get the active sheet (i.e., the first sheet)
+                        worksheet = workbook.active
+                        # print the value in cell A1
+                        # print(sheet['A1'].value)
+
+                        for row in worksheet.iter_rows(min_row=2, values_only=True):
+                            # create a new condition dictionary
+                            condition = {}
+                            
+                            # add the name
+                            condition["name"] = row[0]
+                            
+                            # add the pattern dictionary
+                            condition["pattern"] = {}
+                            
+                            # add the subject as a list
+                            condition["pattern"]["subject"] = [x.strip() for x in row[1].split("|")]
+                            
+                            # add the body as a list
+                            condition["pattern"]["body"] = [x.strip() for x in row[2].split("|")]
+                            
+                            # add the attachments filename as a list
+                            condition["pattern"]["attachments"] = [{"filename": [x.strip()]} for x in row[3].split("|")]
+                            
+                            # add the recipients as a list
+                            # condition["pattern"]["delivery"] = {"recipients": [x.strip() for x in row[4].split("|")], "body": row[5]}
+
+                            # add the recipients as a list
+                            condition["delivery"] = {"target": "email_forward", "recipients": [x.strip() for x in row[4].split("|")], "body": row[5]}
+                        
+                            # add the condition to the output dictionary
+                            email_rules["conditions"].append(condition)
+
+                # print(json.dumps(email_rules, indent=4))
+            except:
+                return email_rules
+    
+    return email_rules
+
+def transmit_files(condition_name, target, delivery_details, email_date, attachment_name, attachment_content):
     """Transmit files to an target location"""
-    attachment_content = part.get_payload(decode=True)
+    # attachment_content = part.get_payload(decode=True)
+    if 'append_datetime' in delivery_details and str(delivery_details['append_datetime'].lower()) == 'true':
+        # datetime_string = datetime.datetime.fromtimestamp(datetime.datetime.now().timestamp()).strftime("%Y-%m-%d_%H%M%S")
+        datetime_obj = datetime.datetime.strptime(email_date, "%Y-%m-%dT%H:%M:%SZ")
+        datetime_string = datetime_obj.strftime("%Y-%m-%d_%H%M%S")
+        parts = attachment_name.split('.')
+        base_attachment_name = '.'.join(parts[:-1])
+        extension = parts[-1]
+        attachment_name = f"{base_attachment_name}_{datetime_string}.{extension}"
     
     if target == 'local':
         delivery_path = delivery_details['path']
@@ -69,6 +178,31 @@ def transmit_files(condition_name, target, delivery_details, attachment_name):
 
         s3.put_object(Body=attachment_content, Bucket=bucket_name, Key=attachment_name)
 
+def forward_email(message, delivery_details):
+    """Forward the email to any number of recipients"""
+    global email_client, o365_email_user_id
+    message_id = message['id']
+    recipients = delivery_details['recipients']
+    # custom_subject = delivery_details.get('subject', '') # have not been able to get overwriting the subject line working
+    custom_body = delivery_details.get('body', '')
+    forward_endpoint = f"/users/{o365_email_user_id}/messages/{message_id}/forward"
+
+    # Define the recipient list
+    to_recipients = [{'emailAddress': {'address': recipient}} for recipient in recipients]
+
+    # Define the payload
+    payload = {
+        'toRecipients': to_recipients,
+        'comment': custom_body,
+        'send': True
+    }
+
+    # if custom_subject != '':
+    #     payload['subject'] = custom_subject
+
+    # Forward the email
+    email_client.post(forward_endpoint, json=payload)
+
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(current_dir)
@@ -84,6 +218,10 @@ else:
 for account in o365_accounts['o365_accounts']:
     email_account = account['email_account']
     email_account_name = email_account['account_name']
+
+    # read rules
+    email_rules = retrieve_rules(email_account_name)
+
     o365_email_username = email_account['o365_username']
     o365_email_user_id = email_account['o365_user_id']
     o365_email_tenant_id = email_account['o365_tenant_id']
@@ -92,123 +230,83 @@ for account in o365_accounts['o365_accounts']:
     o365_emailpassword = pw(email_account_name, email_password_key)
     email_client = authenticate(o365_email_tenant_id, o365_email_client_id, o365_emailpassword)
 
-    sharepoint_account = account['sharepoint_account']
-    sharepoint_account_name = sharepoint_account['account_name']
-    o365_sharepoint_username = sharepoint_account['o365_username']
-    o365_sharepoint__user_id = sharepoint_account['o365_user_id']
-    o365_sharepoint_tenant_id = sharepoint_account['o365_tenant_id']
-    o365_sharepoint_client_id = sharepoint_account['o365_client_id']
-    sharepoint_password_key = sharepoint_account['o365_password_key']
-    o365_sharepointpassword = pw(sharepoint_account_name, sharepoint_password_key)
-    sharepoint_client = authenticate(o365_sharepoint_tenant_id, o365_sharepoint_client_id, o365_sharepointpassword)
+    # search_parameters = {
+    #     "$search": "isRead eq false",
+    #     "$orderby": "receivedDateTime desc"
+    # }
 
-    # user_principal_name = "206705394@tfayd.com"
-    # response = email_client.get(f"/users/{user_principal_name}")
-    # user = response.json()
-    o365_email_user_id = "06091a12-c517-425f-aab8-e4842c01da14"
-    # o365_email_user_id = "f1144887-d3fb-4ef9-911e-e6851753679e"
+    # define the API endpoint for retrieving emails
+    api_endpoint = f"/users/{o365_email_user_id}/mailfolders/inbox/messages?$filter=isRead eq false&$orderby=receivedDateTime desc"
+    result = email_client.get(api_endpoint).json()
 
-    # Read Rules
-    config_data = retrieve_rules(email_account_name)
-
-    search_parameters = {
-        "$search": "isRead ne true",
-        "$orderby": "receivedDateTime desc"
-    }
-
-    # Define the API endpoint for retrieving emails
-    api_endpoint = f"/users/{o365_email_user_id}/messages"
-
-    # Retrieve all unread emails
-    result = email_client.get(api_endpoint, params=search_parameters).json()
+    # for message in result['value']:
+    #     print(message['subject'].lower() + ' | ' + message['receivedDateTime'])
 
     if len(result) == 0:
         print('No Unread messages to process')
         continue
 
-    # Loop through all unread emails
+    # loop through all unread emails
     for message in result['value']:
         # Fetch the email content
         email_id = message['id']
 
-        # Mark the email as read
-        # client.patch(f"{api_endpoint}/{email_id}", json={'isRead': True})
-
-        # Extract relevant fields from the email message
+        # extract relevant fields from the email message
         email_subject = message['subject'].lower()
         email_from = message['from']['emailAddress']['address'].lower()
         email_to = [recipient['emailAddress']['address'].lower() for recipient in message['toRecipients']]
         email_date = message['receivedDateTime']
 
-        response = email_client.get(f"{api_endpoint}/{email_id}", params={'$select': 'body'})
+        response = email_client.get(f"{api_endpoint}", params={'$select': 'body'})
         email_body = ''
 
-        # Check if the email is multipart
-        if 'multipart' in response.json()['body']['contentType']:
+        # check if the email is multipart
+        if 'multipart' in response.json()['value'][0]['body']['contentType']:
             for part in response.json()['body']['content']:
                 # Check if the part contains plain text
                 if 'text/plain' in part['contentType']:
                     email_body = part['content']
                     break
         else:
-            email_body = response.json()['body']['content']
+            email_body = response.json()['value'][0]['body']['content']
 
-        # Decode the email body if it is base64 encoded
-        if 'base64' in response.json()['body']:
+        # decode the email body if it is base64 encoded
+        if 'base64' in response.json()['value'][0]['body']:
             email_body = base64.b64decode(email_body).decode()
 
-        # Convert the email body to lowercase
+        # convert the email body to lowercase
         email_body = email_body.lower()
 
-        # retrieve any attachments
-        attachment_list = []
-        for message in result['value']:
-            # Check if the message has attachments
-            if message['hasAttachments']:
-                # Retrieve the attachments
-                attachment_endpoint = f"/users/{o365_email_user_id}/messages/{message['id']}/attachments"
-                attachments = email_client.get(attachment_endpoint).json()
+        # retrieve any attachment names.  Could potentially be used to check attachment patterns without having to actually fully download them
+        # for message in result['value']:
+        #     # Check if the message has attachments
+        #     if message['hasAttachments']:
+        #         # Retrieve the attachment names
+        #         attachment_endpoint = f"/users/{o365_email_user_id}/messages/{message['id']}/attachments?$select=name"
+        #         attachments = email_client.get(attachment_endpoint).json()
+        #         attachment_names = [attachment['name'] for attachment in attachments['value']]
 
-                # Loop through all the attachments and append to the list
-                for attachment in attachments['value']:
-                    attachment_list.append(attachment)
+        # check if the message has attachments
+        if message['hasAttachments']:
+            # Retrieve the attachments
+            attachment_endpoint = f"/users/{o365_email_user_id}/messages/{message['id']}/attachments"
+            attachments = email_client.get(attachment_endpoint).json()
 
-        # attachments = []
-        # if message['hasAttachments']:
-        #     # email_id = message['id']
-        #     attachments_endpoint = f"/users/{user_id}/messages/{email_id}/attachments"
-        #     attachments = client.get(attachments_endpoint).json()
-
-        #     # attachments is a list of dictionaries, each containing information about an attachment
-        #     for attachment in attachments['value']:
-        #         attachment_id = attachment['id']
-        #         attachment_name = attachment['name']
-        #         attachment_content_type = attachment['contentType']
-        #         attachment_size = attachment['size']
-
-        #         # Get the content of the attachment
-        #         attachment_endpoint = f"/users/{user_id}/messages/{email_id}/attachments/{attachment_id}/$value"
-        #         attachment_content = client.get(attachment_endpoint).content
+        # mark the email as read
+        email_client.patch(f"/users/{o365_email_user_id}/messages/{email_id}", json={'isRead': True})
 
         # check if email meets any of the defined patterns
-        for condition in config_data['conditions']:
+        for condition in email_rules['conditions']:
             condition_name = condition['name']
             if condition_name == 'example_entry_will_be_ignored':
                 continue
-
-            if 'delivery' in condition:
-                delivery_target = condition['delivery']['target']
-                # delivery_path = condition['delivery']['path']
-            else:
-                target = None
-                # path = None
 
             pattern = condition['pattern']
 
             meets_criteria = True
                 
             # ensure the proper definitions are present
-            if not 'attachments' in pattern or not ('sender' in pattern or 'subject' in pattern or 'body' in pattern):
+            if not ('attachments' in pattern or 'sender' in pattern or 'subject' in pattern or 'body' in pattern):
                 meets_criteria = False
                 continue
 
@@ -220,7 +318,7 @@ for account in o365_accounts['o365_accounts']:
             # check subject patterns
             if 'subject' in pattern:
                 subject_patterns = pattern['subject']
-                subject_matches = [pattern for pattern in subject_patterns if pattern.lower() in email_subject]
+                subject_matches = [pattern for pattern in subject_patterns if pattern.lower() in email_subject.lower()]
                 if not subject_matches:
                     meets_criteria = False
                     continue
@@ -228,32 +326,36 @@ for account in o365_accounts['o365_accounts']:
             # check body patterns
             if 'body' in pattern:
                 body_patterns = pattern['body']
-                body_matches = [pattern for pattern in body_patterns if pattern.lower() in email_body]
+                body_matches = [pattern for pattern in body_patterns if pattern.lower() in email_body.lower()]
                 if not body_matches:
                     meets_criteria = False
                     continue
+
+            if 'delivery' in condition:
+                delivery_target = condition['delivery']['target']
+            else:
+                delivery_target = None
             
             # check attachment pattern
             if meets_criteria and 'attachments' in pattern:
-                any_attachment_matched = False
-                for i, attachment in enumerate(attachments):
-                    attachment_matches = [pattern.lower() for pattern in pattern['attachments'][0]['filename']]
-                    if all(pattern in attachment.lower() for pattern in attachment_matches):
-                        print(f'Attachment {i+1} meets the condition: {condition_name}')
-                        if delivery_target:
-                            transmit_files(condition_name, delivery_target, condition['delivery'], attachment)
+                attachment_matches = [pattern.lower() for pattern in pattern['attachments'][0]['filename']]
+                for attachment in attachments['value']:
+                    attachment_name = attachment['name'].lower()
+                    if all(pattern in attachment_name for pattern in attachment_matches):
+                        print(f'Attachment {attachment_name} meets the condition: {condition_name}')
+                        if delivery_target != 'email_forward':
+                            attachment_content = base64.b64decode(attachment['contentBytes'])
+                            transmit_files(condition_name, delivery_target, condition['delivery'], email_date, attachment['name'], attachment_content)
                         any_attachment_matched = True
                 if not any_attachment_matched:
                     meets_criteria = False
                     continue
 
-                # mark email as read
-                # o365_conn.store(email_id, '+FLAGS', '\\Flagged')
+            if meets_criteria and delivery_target == 'email_forward':
+                forward_email(message, condition['delivery'])
 
-                # this prevents the email from being compared against other patterns.  If you wish to have the email evaluated against other conditions, such as to extract other attachments, remove these lines
-                if meets_criteria == True:
-                    break
+            # this prevents the email from being compared against further patterns.  If you wish to have the email evaluated against other conditions, such as to extract other attachments, remove these lines
+            if meets_criteria == True:
+                break
 
-    # close the o365 connection
-    o365_conn.close()
-    o365_conn.logout()
+# %%
