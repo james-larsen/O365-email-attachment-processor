@@ -1,6 +1,6 @@
 # O365 Email Attachment Processor
 
-The purpose of this application is to allow people to set up a number of o365 email accounts, login to them periodically, and check unread emails against a set of patterns, including sender, subject, and body, as well as attachment patterns.  When a match is found, the attachment is routed to a specified location.  New o365 accounts and patterns can be added using JSON files.
+The purpose of this application is to allow people to set up a number of o365 email accounts, login to them periodically, and check unread emails against a set of rules, including sender, subject, body, and attachment patterns, as well as delivery instructions.  When a match is found, the attachment is routed to a specified location locally or to an S3 bucket.  The rule can also be configured to forward the email to multiple recipients.  New o365 accounts and patterns can be added using JSON files.  Patterns and delivery instructions can also be provided via JSON files hosted locally and .xslx files hosted on Sharepoint.
 
 ## Requirements
 
@@ -39,6 +39,8 @@ Configure the following files:
 
 * ./src/o365-email-attachment-processor/o365_accounts.json
 * ./src/o365-email-attachment-processor/default_email_rules.json
+
+Optionally add rules .xlsx files to a Sharepoint location
 
 ```python
 python3 src/o365-email-attachment-processor/main.py
@@ -217,7 +219,7 @@ For example, if you have an account_name in your "o365_accounts.json" with a val
 
 ### **Sharepoint-Hosted Rules**
 
-In additional to the local JSON files to define rules, you can specify a Sharepoint location to host multiple Excel (.xlsx) files containing rules.  This is useful if you'd like to expose certain rules documents to business users to maintain themselves.  These rules will be appended to the JSON rules.  The document structure is outlined below.
+In additional to the local JSON files to define rules, you can specify a Sharepoint location to host multiple Excel (.xlsx) files containing rules.  This is useful if you'd like to expose certain rules documents to business users to maintain themselves.  These rules will be appended to the JSON rules.  The document structure is outlined below, and a sample file can be found at **./templates/Sample Email Rules.xlsx**.
 
 | *Name* | *Sender* | *Subject* | *Body* | *Filename* | *Recipients* | *Custom Email Body* |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
