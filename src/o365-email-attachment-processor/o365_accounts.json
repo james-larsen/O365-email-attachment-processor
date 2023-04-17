@@ -1,6 +1,7 @@
 {
     "o365_accounts": [
         {
+            "password_method": "keyring", 
             "email_account": {
                 "account_name": "XYZ_Department_Sales_Email",
                 "o365_username": "user1",

@@ -48,11 +48,11 @@ python3 src/o365-email-attachment-processor/main.py
 
 ## Passwords
 
-The module for retrieving database passwords is located at **'./src/o365-email-attachment-processor/utils/password.py'**.  By default it uses the 'keyring' library, accepts two strings of 'secret_key' and 'user_name' and returns a string of 'password'.  If you wish to use a different method of storing and retrieving database passwords, modify this .py file.
+The modules for retrieving secured information are located at **'./src/o365-email-attachment-processor/utils/'**.  The desired method should be specified in the **o365_accounts.json** file.  All methods accept two strings of 'account_name' and 'password_key' and return a string of 'password'.  If you wish to use a different method of storing and retrieving database passwords, You can use the "password_custom.py" file.
 
 If you require more significant changes to how the password is retrieved (Eg. need to pass a different number of parameters), it is called by the **'./src/o365-email-attachment-processor/main.py'** module.
 
-If you do wish to use the keyring library, create the below password entries ("account_name" is specified in the **o365_accounts.json** file below, "name" is specified under a given condition in the **_email_rules.json** files below):
+If you do wish to use the keyring library, create the below password entries.  "account_name" is specified in the **o365_accounts.json** file below, "name" is specified under a given condition in the **_email_rules.json** files discussed below:
 
 * For each o365 account:
     * account_name, o365_password_key
@@ -60,6 +60,14 @@ If you do wish to use the keyring library, create the below password entries ("a
 * For each S3 delivery target:
     * name, "S3AccessKey"
     * name, "S3SecretKey"
+
+Alternatively, if you wish to use a single-argument method, such as AWS Secrets Manager, you can create your Secret IDs in the form of "{account_name}_{o365_password_key}", "{name}_S3AccessKey" and "{name}_S3SecretKey".  Eg if you had a pattern entry with an S3 delivery target named "daily_sales_email", you would name one of your Secret IDs as "daily_sales_email_S3AccessKey".
+
+The following options have been included: 
+* Python keyring library (password_keyring.py)
+* AWS Secrets Manager (password_aws.py)
+* AWS Systems Manager Parameter Store (password_ssm.py)
+* Custom method (password_custom.py)
 
 ## Account Permissions
 
@@ -72,7 +80,7 @@ MailSend
 User.Read.All
 ```
 
-Sharepoint Permissions:
+Sharepoint Permissions (optional):
 ```
 User.Read
 Sites.ReadWrite.All
@@ -92,9 +100,10 @@ Contains the details for each o365 account to be connected to.  It looks like th
 {
     "o365_accounts": [
         {
+            "password_method": "keyring", 
             "email_account": {
                 "account_name": "XYZ_Department_Sales_Email",
-                "o365_username": "user1",
+                "o365_username": "EmailServiceAccount",
                 "o365_user_id": "xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxx",
                 "o365_tenant_id": "xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxx",
                 "o365_client_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
@@ -102,7 +111,7 @@ Contains the details for each o365 account to be connected to.  It looks like th
             },
             "sharepoint_account": {
                 "account_name": "XYZ_Department_Sales_SharePoint",
-                "o365_username": "user2",
+                "o365_username": "SharepointServiceAccount",
                 "o365_site_address": "mycompany.sharepoint.com",
                 "o365_site_name": "MySharepointSite",
                 "o365_site_folderpath": "Documents/General/My Folder",
@@ -115,6 +124,12 @@ Contains the details for each o365 account to be connected to.  It looks like th
     ]
 }
 ```
+
+* ***password_method***:  Method for retrieving secured information.  Accepts one of the following options:
+    * "keyring" - Python keyring library (password_keyring.py)
+    * "secretsmanager" - AWS Secrets Manager (password_aws.py)
+    * "ssm" - AWS Systems Manager Parameter Store (password_ssm.py)
+    * "custom" - Custom method (password_custom.py)
 
 ### Email:
 * ***account_name***:  General name for the file processing area.  It could be named based on the email address being monitored, or the department the files are being delivered for, etc.
@@ -129,13 +144,11 @@ Contains the details for each o365 account to be connected to.  It looks like th
 * ***o365_username***:  Login username for o365 server
 * ***o365_site_address***:  Address for your Sharepoint site
 * ***o365_site_name***:  Site name containing the rules folder
-* ***o365_site_folderpath***:  Full path to the rules folder.  Must start with "Documents"
+* ***o365_site_folderpath***:  Full path to the rules folder.  **Must start with "Documents"**
 * ***o365_user_id***:  o365 Sharepoint account internal ID
 * ***o365_tenant_id***:  o365 Tenant ID
 * ***o365_client_id***:  o365 Client ID
 * ***o365_password_key***:  Key to be used along with "account_name" for retrieving the correct Secret Key
-
-**Note:**  The Sharepoint functionality is the most likely to have issues, depending on how your site is configured.  Knowledge of the "msgraph.core.GraphClient" library my be needed to point the application to the correct folder
 
 ---
 
@@ -180,7 +193,7 @@ Holds the specific patterns to look for and where to deliver the files when they
 }
 
 ```
-**Note: Multiple "delivery" keys shown for reference, but only one should be used per condition entry**
+**Note: Multiple "delivery" entries shown for reference, but only one should be used per condition entry**
 
 * ***name***:  Name for the condition being defined
 * ***pattern***
@@ -190,7 +203,7 @@ Holds the specific patterns to look for and where to deliver the files when they
     * ***filename***:  List of strings to check against the "Filename" field of each attachment
 * ***delivery***
     * ***target***:  Delivery target type (local, s3 or email_forward)
-    * ***append_datetime***:  Whether to append the email datetime to the end of the attachment.  Accepts "True", anything else will be evaluated to False.  Date will be in the format of "_YYYY-MM-DD_HHMISS" in the UTC timezone
+    * ***append_datetime***:  Whether to append the email datetime to the end of the attachment name.  Accepts "True", anything else will be evaluated to False.  Date will be in the format of "_YYYY-MM-DD_HHMISS" in the UTC timezone
     * ***path***:  Local file path to deliver attachments
     * ***region***:  S3 bucket region
     * ***bucket***:  S3 bucket name
@@ -219,7 +232,7 @@ For example, if you have an account_name in your "o365_accounts.json" with a val
 
 ### **Sharepoint-Hosted Rules**
 
-In additional to the local JSON files to define rules, you can specify a Sharepoint location to host multiple Excel (.xlsx) files containing rules.  This is useful if you'd like to expose certain rules documents to business users to maintain themselves.  These rules will be appended to the JSON rules.  The document structure is outlined below, and a sample file can be found at **./templates/Sample Email Rules.xlsx**.
+In additional to the local JSON files to define rules, you can specify a Sharepoint location to host multiple Excel (.xlsx) files containing rules for forwarding emails.  This is useful to expose certain rules documents to business users to maintain themselves.  These rules will be appended to the JSON-sourced rules.  The document structure is outlined below, and a sample file can be found at **./templates/Sample Email Rules.xlsx**.
 
 | *Name* | *Sender* | *Subject* | *Body* | *Filename* | *Recipients* | *Custom Email Body* |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -227,16 +240,18 @@ In additional to the local JSON files to define rules, you can specify a Sharepo
 
 **Notes:**
 
+* All rules defined through this method are treated as "email_forward" delivery option
 * You can add additional sheets to the Excel document, but don't rename the "Email Rules" sheet.  Similarly, you can add additional columns to the right of "Custom Email Body", but don't change the order of the existing columns
 * Do not include any .xlsx files in this folder that are not rules documents
 * Sender, Subject, Body and Filename are search text patterns, similar to those described above
 * For Subject, Body, Filename and Recipients, multiple patterns can be represented with a pipe ("|"), a line break (Alt + Enter in cell), or both.  Sender only allows a single pattern
 * "Custom Email Body" is an optional field.  If left blank, the email will be forwarded with no body text
 * Text is not case sensitive
+* The Sharepoint functionality is the most likely to have issues, depending on how your site is configured.  Knowledge of the "msgraph.core.GraphClient" library my be needed to point the application to the correct folder.  The application attempts to retrieve the correct folder end point using the "main.get_sharepoint_folder" function
 
 [## Logging]:#
 
-[TBD]:#
+[TBD - To be added in a future release]:#
 
 ## About the Author
 

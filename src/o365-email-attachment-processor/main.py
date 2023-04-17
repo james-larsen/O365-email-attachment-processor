@@ -12,7 +12,7 @@ import openpyxl
 import boto3
 # import configparser
 # pylint: disable=import-error
-from utils.password import get_password as pw
+# from utils.password import get_password as pw
 # pylint: enable=import-error
 
 #%%
@@ -225,6 +225,19 @@ else:
 
 #%%
 for account in o365_accounts['o365_accounts']:
+    # choose appropriate password method
+    password_method = account['password_method'].lower()
+    # pylint: disable=import-error
+    if password_method == 'keyring':
+        from utils.password_keyring import get_password as pw
+    elif password_method == 'secretsmanager':
+        from utils.password_aws import get_password as pw
+    elif password_method == 'ssm':
+        from utils.password_ssm import get_password as pw
+    if password_method == 'custom':
+        from utils.password_custom import get_password as pw
+    # pylint: enable=import-error
+
     email_account = account['email_account']
     email_account_name = email_account['account_name']
     o365_email_username = email_account['o365_username']
@@ -268,6 +281,11 @@ for account in o365_accounts['o365_accounts']:
         email_from = message['from']['emailAddress']['address'].lower()
         email_to = [recipient['emailAddress']['address'].lower() for recipient in message['toRecipients']]
         email_date = message['receivedDateTime']
+
+        if 'undeliverable' in email_subject:
+            # mark the email as read
+            email_client.patch(f"/users/{o365_email_user_id}/messages/{email_id}", json={'isRead': True})
+            continue
 
         response = email_client.get(f"{api_endpoint}", params={'$select': 'body'})
         email_body = ''
