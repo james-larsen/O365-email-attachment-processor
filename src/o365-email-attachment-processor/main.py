@@ -10,6 +10,7 @@ from azure.identity import ClientSecretCredential
 from msgraph.core import GraphClient
 import openpyxl
 import boto3
+# import pysftp
 # import configparser
 # pylint: disable=import-error
 # from utils.password import get_password as pw
@@ -186,6 +187,29 @@ def transmit_files(condition_name, target, delivery_details, email_date, attachm
         s3 = boto3.client('s3', aws_access_key_id=s3_access_key, aws_secret_access_key=s3_secret_key, region_name=bucket_region)
 
         s3.put_object(Body=attachment_content, Bucket=bucket_name, Key=attachment_name)
+
+    # if target == 'sftp':
+    #     sftp_hostname = delivery_details['hostname']
+    #     sftp_port = int(delivery_details['port'])
+    #     sftp_username = delivery_details['username']
+    #     sftp_password_key = delivery_details['password_key']
+    #     if 'subfolder' in delivery_details:
+    #         sftp_subfolder = delivery_details['subfolder']
+    #     sftp_password = pw(condition_name, sftp_password_key)
+        
+    #     cnopts = pysftp.CnOpts()
+    #     cnopts.hostkeys = None
+
+    #     with pysftp.Connection(host=sftp_hostname, username=sftp_username, password=sftp_password, cnopts=cnopts) as sftp:
+    #         # Change to the remote directory
+    #         sftp.chdir(sftp_subfolder)
+            
+    #         # Get a list of files in the directory
+    #         file_list = sftp.listdir()
+
+    #         # Print the file names
+    #         for file_name in file_list:
+    #             print(file_name)
 
 def forward_email(message, delivery_details):
     """Forward the email to any number of recipients"""

@@ -193,7 +193,7 @@ Holds the specific patterns to look for and where to deliver the files when they
 }
 
 ```
-**Note: Multiple "delivery" entries shown for reference, but only one should be used per condition entry**
+**Note: Multiple "delivery" entries shown for reference, but only one should be used per condition entry.  Also, example file shows an entry for "sftp" delivery type, but that functionality is still under development**
 
 * ***name***:  Name for the condition being defined
 * ***pattern***

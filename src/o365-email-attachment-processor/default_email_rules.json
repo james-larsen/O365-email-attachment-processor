@@ -25,6 +25,15 @@
         "append_datetime": "True"
       },
       "delivery": {
+        "target": "sftp", 
+        "hostname": "server.sftp.com",
+        "port": "22",
+        "username": "Username", 
+        "password_key": "MyPasswordKey", 
+        "subfolder": "sub-folder1/sub-folder2/", 
+        "append_datetime": "True"
+      },
+      "delivery": {
         "target": "email_forward",
         "recipients": ["email@server.com"],
         "body": "This is a custom email body"
