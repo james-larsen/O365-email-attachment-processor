@@ -285,7 +285,7 @@ for account in o365_accounts['o365_accounts']:
     # for message in result['value']:
     #     print(message['subject'].lower() + ' | ' + message['receivedDateTime'])
 
-    if len(result['value']) == 0:
+    if 'value' in result and len(result['value']) == 0:
         print('No Unread messages to process')
         continue
 
