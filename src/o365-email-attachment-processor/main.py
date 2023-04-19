@@ -184,7 +184,7 @@ def transmit_files(condition_name, target, delivery_details, email_date, attachm
         s3_secret_key = pw(condition_name, "S3SecretKey")
 
         # Create an S3 client using the access key and secret key
-        s3 = boto3.client('s3', aws_access_key_id=s3_access_key, aws_secret_access_key=s3_secret_key, region_name=bucket_region)
+        s3 = boto3.client('s3', aws_access_key_id=s3_access_key, aws_secret_access_key=s3_secret_key, region_name=bucket_region, use_ssl=True)
 
         s3.put_object(Body=attachment_content, Bucket=bucket_name, Key=attachment_name)
 
