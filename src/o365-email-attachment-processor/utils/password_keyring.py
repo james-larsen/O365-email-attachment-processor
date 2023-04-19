@@ -1,4 +1,4 @@
-"""Retrieve password"""
+"""Retrieve password using keyring library"""
 import keyring
 
 def get_password(account_name, password_key):
